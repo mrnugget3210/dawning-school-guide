@@ -20,13 +20,13 @@ function activity(name, type = "class", duration = 30) {
 }
 function createDefaults() {
   const makeDay = (subjects) => [
-  activity(subjects[0], "class", 10),
-  activity(subjects[1], "class", 10),
-  activity("Recreo", "break", 10),
-  activity(subjects[2], "class", 10),
-  activity("Bus escolar", "event", 5),
-  activity("Noche", "night", 15)
-];
+    activity(subjects[0], "class", 10),
+    activity(subjects[1], "class", 10),
+    activity("Recreo", "break", 10),
+    activity(subjects[2], "class", 10),
+    activity("Bus escolar", "event", 5),
+    activity("Noche", "night", 15)
+  ];
   return {
     lunes: makeDay(["Matemática", "Lenguaje", "Historia"]),
     martes: makeDay(["Ciencias naturales", "Inglés", "Artes visuales"]),
@@ -50,6 +50,7 @@ let toastTimeout = null;
 const $ = (id) => document.getElementById(id);
 const daySelect = $("daySelect");
 const activityList = $("activityList");
+const blockDurationList = $("blockDurationList");
 const activityDialog = $("activityDialog");
 const activityForm = $("activityForm");
 
@@ -116,8 +117,59 @@ function showToast(message) {
 }
 function renderAll() {
   $("currentDayChip").textContent = DAY_NAMES[selectedDay];
+  renderBlockDurations();
   renderActivities();
   renderTimer();
+}
+function renderBlockDurations() {
+  blockDurationList.innerHTML = "";
+  const maxBlocks = Math.max(0, ...Object.values(schedules).map(items =>
+    items.filter(item => item.type === "class").length
+  ));
+  if (maxBlocks === 0) {
+    blockDurationList.innerHTML = '<p class="empty-state">Añade una actividad de tipo Clase para configurar sus bloques.</p>';
+    return;
+  }
+
+  for (let blockIndex = 0; blockIndex < maxBlocks; blockIndex++) {
+    const firstAvailable = Object.keys(DAY_NAMES)
+      .map(day => schedules[day].filter(item => item.type === "class")[blockIndex])
+      .find(item => item);
+    const field = document.createElement("label");
+    field.className = "block-duration-field";
+    field.innerHTML = `
+      <span>Bloque ${blockIndex + 1}</span>
+      <span class="duration-input-wrap">
+        <input class="text-control block-duration-input" type="number" min="1" max="1440" step="1"
+          value="${firstAvailable.duration}" data-block-index="${blockIndex}" aria-label="Duración del bloque ${blockIndex + 1} en minutos">
+        <span>min</span>
+      </span>`;
+    blockDurationList.appendChild(field);
+  }
+}
+function updateBlockDuration(input) {
+  const blockIndex = Number(input.dataset.blockIndex);
+  const duration = Number(input.value);
+  if (!Number.isInteger(blockIndex) || !Number.isFinite(duration) || duration < 1 || duration > 1440) {
+    showToast("La duración debe ser de 1 a 1440 minutos.");
+    renderBlockDurations();
+    return;
+  }
+
+  for (const day of Object.keys(DAY_NAMES)) {
+    const classBlocks = schedules[day].filter(item => item.type === "class");
+    if (classBlocks[blockIndex]) classBlocks[blockIndex].duration = duration;
+  }
+
+  const selectedItem = currentActivityItem();
+  if (selectedItem?.type === "class") {
+    const selectedBlockIndex = currentSchedule().slice(0, currentIndex + 1)
+      .filter(item => item.type === "class").length - 1;
+    if (selectedBlockIndex === blockIndex) resetClockForCurrent();
+  }
+  saveSchedules();
+  renderAll();
+  showToast(`Duración del Bloque ${blockIndex + 1} actualizada en todos los días.`);
 }
 function renderActivities() {
   activityList.innerHTML = "";
@@ -328,6 +380,9 @@ function restoreDefaults() {
 }
 
 daySelect.addEventListener("change", changeDay);
+blockDurationList.addEventListener("change", event => {
+  if (event.target.matches(".block-duration-input")) updateBlockDuration(event.target);
+});
 $("startPauseBtn").addEventListener("click", toggleTimer);
 $("nextBtn").addEventListener("click", () => advanceActivity(false));
 $("restartBtn").addEventListener("click", () => {
@@ -349,6 +404,4 @@ activityDialog.addEventListener("click", event => {
 });
 
 resetClockForCurrent();
-renderAll();
-
 renderAll();

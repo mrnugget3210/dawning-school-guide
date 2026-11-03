@@ -38,6 +38,17 @@
         </select>
       </section>
 
+      <section class="panel durations-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">AJUSTES GLOBALES</p>
+            <h2>Duración por bloque</h2>
+          </div>
+        </div>
+        <p class="hint">Cambia la duración de un bloque de clase para actualizar ese mismo bloque en todos los días. Recreo, Bus escolar y Noche mantienen su duración independiente.</p>
+        <div id="blockDurationList" class="block-duration-list"></div>
+      </section>
+
       <section class="panel timer-panel">
         <div class="timer-topline">
           <span class="live-dot"></span>
@@ -89,11 +100,11 @@
       </div>
       <label class="field-label" for="activityName">Nombre</label>
       <input id="activityName" class="text-control" maxlength="60" placeholder="Ej. Ciencias" required list="subjectSuggestions">
-<datalist id="subjectSuggestions">
-<option value="Matemática"></option><option value="Lenguaje"></option>
-<option value="Ciencias naturales"></option><option value="Historia"></option>
-<option value="Artes visuales"></option><option value="Música"></option><option value="Inglés"></option>
-</datalist>
+      <datalist id="subjectSuggestions">
+        <option value="Matemática"></option><option value="Lenguaje"></option>
+        <option value="Ciencias naturales"></option><option value="Historia"></option>
+        <option value="Artes visuales"></option><option value="Música"></option><option value="Inglés"></option>
+      </datalist>
       <label class="field-label" for="activityType">Tipo de actividad</label>
       <select id="activityType" class="select-control">
         <option value="class">📘 Clase</option>
