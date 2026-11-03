@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawning School Guide</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PANEL DE ORGANIZACIÓN</p>
+        <h1>🏫 Dawning School Guide</h1>
+        <p class="subtitle">Organiza los horarios de tu escuela de roleplay en TPRR.</p>
+      </div>
+      <div class="save-status" id="saveStatus" aria-live="polite">Guardado localmente</div>
+    </header>
+
+    <main>
+      <section class="panel controls-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">CALENDARIO</p>
+            <h2>Horario por día</h2>
+          </div>
+          <button class="button button-secondary" id="resetAllBtn" type="button">Restaurar ejemplos</button>
+        </div>
+        <label class="field-label" for="daySelect">Día que quieres configurar</label>
+        <select id="daySelect" class="select-control">
+          <option value="lunes">Lunes</option>
+          <option value="martes">Martes</option>
+          <option value="miercoles">Miércoles</option>
+          <option value="jueves">Jueves</option>
+          <option value="viernes">Viernes</option>
+          <option value="sabado">Sábado</option>
+          <option value="domingo">Domingo</option>
+        </select>
+      </section>
+
+      <section class="panel timer-panel">
+        <div class="timer-topline">
+          <span class="live-dot"></span>
+          <span id="timerState">LISTO PARA COMENZAR</span>
+          <span class="day-chip" id="currentDayChip">Lunes</span>
+        </div>
+        <p class="eyebrow">ACTIVIDAD ACTUAL</p>
+        <h2 id="currentActivity">Matemáticas</h2>
+        <div class="timer-display" id="timerDisplay">30:00</div>
+        <div class="progress-track" aria-label="Progreso de la actividad">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p class="next-up" id="nextActivity">Siguiente: Recreo</p>
+        <div class="timer-buttons">
+          <button class="button button-primary" id="startPauseBtn" type="button">▶ Iniciar</button>
+          <button class="button button-secondary" id="nextBtn" type="button">Saltar actividad ⏭</button>
+          <button class="button button-secondary" id="restartBtn" type="button">↺ Reiniciar actividad</button>
+        </div>
+        <p class="hint">El temporizador funciona mientras esta pestaña esté abierta. Mantén la página abierta durante el evento.</p>
+      </section>
+
+      <section class="panel schedule-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">PLAN DEL DÍA</p>
+            <h2>Actividades programadas</h2>
+          </div>
+          <button class="button button-primary" id="addActivityBtn" type="button">＋ Añadir actividad</button>
+        </div>
+        <p class="hint">Puedes cambiar el nombre, el tipo, la duración y el orden. La duración se mide en minutos.</p>
+        <div id="activityList" class="activity-list"></div>
+        <div class="bottom-actions">
+          <button class="button button-secondary" id="saveDayBtn" type="button">Guardar horario del día</button>
+          <button class="button button-danger" id="clearDayBtn" type="button">Vaciar este día</button>
+        </div>
+      </section>
+    </main>
+    <footer>Dawning School Guide · Guarda los horarios en este navegador usando almacenamiento local.</footer>
+  </div>
+
+  <dialog id="activityDialog" class="activity-dialog">
+    <form method="dialog" id="activityForm">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">CONFIGURACIÓN</p>
+          <h2 id="dialogTitle">Añadir actividad</h2>
+        </div>
+        <button class="icon-button" value="cancel" aria-label="Cerrar">✕</button>
+      </div>
+      <label class="field-label" for="activityName">Nombre</label>
+      <input id="activityName" class="text-control" maxlength="60" placeholder="Ej. Ciencias" required list="subjectSuggestions">
+<datalist id="subjectSuggestions">
+<option value="Matemática"></option><option value="Lenguaje"></option>
+<option value="Ciencias naturales"></option><option value="Historia"></option>
+<option value="Artes visuales"></option><option value="Música"></option><option value="Inglés"></option>
+</datalist>
+      <label class="field-label" for="activityType">Tipo de actividad</label>
+      <select id="activityType" class="select-control">
+        <option value="class">📘 Clase</option>
+        <option value="break">🔔 Recreo</option>
+        <option value="night">🌙 Noche</option>
+        <option value="event">⭐ Evento / Otro</option>
+      </select>
+      <label class="field-label" for="activityDuration">Duración en minutos</label>
+      <input id="activityDuration" class="text-control" type="number" min="1" max="1440" value="30" required>
+      <p class="hint">Las actividades nuevas empiezan con 10 minutos. Puedes personalizar su duración.</p>
+      <div class="dialog-actions">
+        <button class="button button-secondary" value="cancel" type="button" id="cancelDialogBtn">Cancelar</button>
+        <button class="button button-primary" value="default" type="submit">Guardar actividad</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
