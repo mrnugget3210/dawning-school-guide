@@ -1,7 +1,9 @@
 const DAY_NAMES = {
   lunes: "Lunes", martes: "Martes", miercoles: "Miércoles",
-  jueves: "Jueves", viernes: "Viernes", sabado: "Sábado", domingo: "Domingo"
+  jueves: "Jueves", viernes: "Viernes", sabado: "Sábado", domingo: "Domingo",
+  aleatorio: "Aleatorio"
 };
+const NORMAL_DAYS = Object.keys(DAY_NAMES).filter(day => day !== "aleatorio");
 const TYPE_INFO = {
   class: { label: "Clase", icon: "📘" },
   break: { label: "Recreo", icon: "🔔" },
@@ -9,6 +11,7 @@ const TYPE_INFO = {
   event: { label: "Evento / Otro", icon: "⭐" }
 };
 const STORAGE_KEY = "dawningSchoolGuide.v3";
+const PE_MIGRATION_KEY = `${STORAGE_KEY}.educacionFisica`;
 
 function makeId() {
   return (window.crypto && crypto.randomUUID)
@@ -27,9 +30,11 @@ function createDefaults() {
     activity("Bus escolar", "event", 5),
     activity("Noche", "night", 15)
   ];
+  const tuesday = makeDay(["Ciencias naturales", "Inglés", "Artes visuales"]);
+  tuesday.splice(4, 0, activity("Educación física", "class", 10));
   return {
     lunes: makeDay(["Matemática", "Lenguaje", "Historia"]),
-    martes: makeDay(["Ciencias naturales", "Inglés", "Artes visuales"]),
+    martes: tuesday,
     miercoles: makeDay(["Música", "Matemática", "Ciencias naturales"]),
     jueves: makeDay(["Historia", "Lenguaje", "Inglés"]),
     viernes: makeDay(["Artes visuales", "Música", "Matemática"]),
@@ -39,6 +44,7 @@ function createDefaults() {
 }
 let schedules = loadSchedules();
 let selectedDay = "lunes";
+let randomSchedule = null;
 let currentIndex = 0;
 let remainingSeconds = 0;
 let totalSeconds = 0;
@@ -60,7 +66,7 @@ function loadSchedules() {
     if (!saved) return createDefaults();
     const parsed = JSON.parse(saved);
     const defaults = createDefaults();
-    for (const day of Object.keys(DAY_NAMES)) {
+    for (const day of NORMAL_DAYS) {
       if (!Array.isArray(parsed[day])) parsed[day] = defaults[day];
       parsed[day] = parsed[day].filter(item => item && typeof item.name === "string")
         .map(item => ({
@@ -69,6 +75,18 @@ function loadSchedules() {
           type: TYPE_INFO[item.type] ? item.type : "class",
           duration: clamp(Number(item.duration) || (item.type === "night" ? 15 : item.name === "Bus escolar" ? 5 : 10), 1, 1440)
         }));
+    }
+    if (localStorage.getItem(PE_MIGRATION_KEY) !== "done") {
+      const hasPhysicalEducation = NORMAL_DAYS.some(day =>
+        parsed[day].some(item => item.name.toLocaleLowerCase("es") === "educación física")
+      );
+      if (!hasPhysicalEducation) {
+        const tuesday = parsed.martes;
+        const busIndex = tuesday.findIndex(item => item.name === "Bus escolar");
+        tuesday.splice(busIndex < 0 ? tuesday.length : busIndex, 0, activity("Educación física", "class", 10));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
+      localStorage.setItem(PE_MIGRATION_KEY, "done");
     }
     return parsed;
   } catch {
@@ -82,8 +100,42 @@ function saveSchedules() {
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
+function shuffled(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+function createRandomSchedule() {
+  const classPool = [];
+  const seenNames = new Set();
+  for (const day of NORMAL_DAYS) {
+    for (const item of schedules[day]) {
+      const key = item.name.toLocaleLowerCase("es");
+      if (item.type === "class" && !seenNames.has(key)) {
+        classPool.push(item);
+        seenNames.add(key);
+      }
+    }
+  }
+  const randomClasses = shuffled(classPool).slice(0, 3).map(item => ({ ...item, id: makeId() }));
+  const template = schedules.martes;
+  const breakItem = template.find(item => item.type === "break") || activity("Recreo", "break", 10);
+  const busItem = template.find(item => item.name === "Bus escolar") || activity("Bus escolar", "event", 5);
+  const nightItem = template.find(item => item.type === "night") || activity("Noche", "night", 15);
+  return [
+    randomClasses[0] || activity("Matemática", "class", 10),
+    randomClasses[1] || activity("Lenguaje", "class", 10),
+    { ...breakItem, id: makeId() },
+    randomClasses[2] || activity("Historia", "class", 10),
+    { ...busItem, id: makeId() },
+    { ...nightItem, id: makeId() }
+  ];
+}
 function currentSchedule() {
-  return schedules[selectedDay];
+  return selectedDay === "aleatorio" ? (randomSchedule || []) : schedules[selectedDay];
 }
 function currentActivityItem() {
   return currentSchedule()[currentIndex] || null;
@@ -123,16 +175,15 @@ function renderAll() {
 }
 function renderBlockDurations() {
   blockDurationList.innerHTML = "";
-  const maxBlocks = Math.max(0, ...Object.values(schedules).map(items =>
-    items.filter(item => item.type === "class").length
+  const maxBlocks = Math.max(0, ...NORMAL_DAYS.map(day =>
+    schedules[day].filter(item => item.type === "class").length
   ));
   if (maxBlocks === 0) {
     blockDurationList.innerHTML = '<p class="empty-state">Añade una actividad de tipo Clase para configurar sus bloques.</p>';
     return;
   }
-
   for (let blockIndex = 0; blockIndex < maxBlocks; blockIndex++) {
-    const firstAvailable = Object.keys(DAY_NAMES)
+    const firstAvailable = NORMAL_DAYS
       .map(day => schedules[day].filter(item => item.type === "class")[blockIndex])
       .find(item => item);
     const field = document.createElement("label");
@@ -155,12 +206,10 @@ function updateBlockDuration(input) {
     renderBlockDurations();
     return;
   }
-
-  for (const day of Object.keys(DAY_NAMES)) {
+  for (const day of NORMAL_DAYS) {
     const classBlocks = schedules[day].filter(item => item.type === "class");
     if (classBlocks[blockIndex]) classBlocks[blockIndex].duration = duration;
   }
-
   const selectedItem = currentActivityItem();
   if (selectedItem?.type === "class") {
     const selectedBlockIndex = currentSchedule().slice(0, currentIndex + 1)
@@ -188,10 +237,10 @@ function renderActivities() {
       <div class="type-pill">${info.icon} ${info.label}</div>
       <div class="activity-meta">${item.duration} min</div>
       <div class="card-actions">
-        <button class="icon-button" data-action="up" title="Mover arriba" aria-label="Mover ${escapeHtml(item.name)} arriba" ${index === 0 ? "disabled" : ""}>↑</button>
-        <button class="icon-button" data-action="down" title="Mover abajo" aria-label="Mover ${escapeHtml(item.name)} abajo" ${index === items.length - 1 ? "disabled" : ""}>↓</button>
-        <button class="icon-button" data-action="edit" title="Editar" aria-label="Editar ${escapeHtml(item.name)}">✎</button>
-        <button class="icon-button" data-action="delete" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">🗑</button>
+        <button class="icon-button" data-action="up" title="Mover arriba" aria-label="Mover ${escapeHtml(item.name)} arriba" ${index === 0 || selectedDay === "aleatorio" ? "disabled" : ""}>↑</button>
+        <button class="icon-button" data-action="down" title="Mover abajo" aria-label="Mover ${escapeHtml(item.name)} abajo" ${index === items.length - 1 || selectedDay === "aleatorio" ? "disabled" : ""}>↓</button>
+        <button class="icon-button" data-action="edit" title="Editar" aria-label="Editar ${escapeHtml(item.name)}" ${selectedDay === "aleatorio" ? "disabled" : ""}>✎</button>
+        <button class="icon-button" data-action="delete" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}" ${selectedDay === "aleatorio" ? "disabled" : ""}>🗑</button>
       </div>`;
     card.querySelector(".activity-name").textContent = item.name;
     card.querySelectorAll("button").forEach(button => {
@@ -247,9 +296,7 @@ function startTimer() {
       stopTimer();
       renderTimer();
       showToast(`Terminó: ${currentActivityItem()?.name || "actividad"}`);
-      if (currentSchedule().length > 1) {
-        advanceActivity(true);
-      }
+      if (currentSchedule().length > 1) advanceActivity(true);
       return;
     }
     renderTimer();
@@ -258,7 +305,6 @@ function startTimer() {
 }
 function toggleTimer() {
   if (running) {
-    // Preserve the displayed remaining time before stopping the interval.
     stopTimer();
     renderTimer();
   } else {
@@ -279,6 +325,7 @@ function advanceActivity(auto = false) {
   if (auto) startTimer();
 }
 function handleCardAction(action, id) {
+  if (selectedDay === "aleatorio") return;
   const items = currentSchedule();
   const index = items.findIndex(item => item.id === id);
   if (index < 0) return;
@@ -307,6 +354,10 @@ function handleCardAction(action, id) {
   }
 }
 function openEditor(id = null) {
+  if (selectedDay === "aleatorio") {
+    showToast("Aleatorio genera el horario automáticamente.");
+    return;
+  }
   editingId = id;
   const item = id ? currentSchedule().find(entry => entry.id === id) : null;
   $("dialogTitle").textContent = item ? "Editar actividad" : "Añadir actividad";
@@ -353,11 +404,17 @@ function saveActivityFromForm(event) {
 function changeDay() {
   stopTimer();
   selectedDay = daySelect.value;
+  randomSchedule = selectedDay === "aleatorio" ? createRandomSchedule() : null;
   currentIndex = 0;
   resetClockForCurrent();
   renderAll();
+  if (selectedDay === "aleatorio") showToast("Horario aleatorio generado: solo cambiaron las clases.");
 }
 function clearCurrentDay() {
+  if (selectedDay === "aleatorio") {
+    showToast("No puedes vaciar el horario aleatorio.");
+    return;
+  }
   if (!confirm(`¿Vaciar todas las actividades del ${DAY_NAMES[selectedDay]}? Esta acción no se puede deshacer.`)) return;
   stopTimer();
   schedules[selectedDay] = [];
@@ -371,7 +428,7 @@ function restoreDefaults() {
   if (!confirm("¿Restaurar todos los horarios de ejemplo? Se perderán tus cambios actuales.")) return;
   stopTimer();
   schedules = createDefaults();
-  selectedDay = daySelect.value;
+  randomSchedule = selectedDay === "aleatorio" ? createRandomSchedule() : null;
   currentIndex = 0;
   resetClockForCurrent();
   saveSchedules();
@@ -392,6 +449,10 @@ $("restartBtn").addEventListener("click", () => {
 });
 $("addActivityBtn").addEventListener("click", () => openEditor());
 $("saveDayBtn").addEventListener("click", () => {
+  if (selectedDay === "aleatorio") {
+    showToast("El horario aleatorio se genera automáticamente.");
+    return;
+  }
   saveSchedules();
   showToast(`Horario del ${DAY_NAMES[selectedDay]} guardado.`);
 });
